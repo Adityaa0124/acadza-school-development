@@ -3,7 +3,7 @@ import { ArrowRightIcon, UserIcon, ClockIcon } from './icons';
 
 /**
  * Hub navigation matrix rendered upon admin authentication.
- * Mirrors the modular card layout of the Acadza portal ecosystem.
+ * Fully colored, high-impact module cards matching Acadza design system.
  */
 export default function PortalHub({ onSelectModule, metrics }) {
     return (
@@ -21,78 +21,82 @@ export default function PortalHub({ onSelectModule, metrics }) {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Module 1: User & Student Management */}
+                {/* Module 1: Admin Dashboard (Fully Colored Blue Card) */}
                 <div
                     onClick={() => onSelectModule('users')}
-                    className="group relative bg-white border border-disabled rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden flex flex-col justify-between"
+                    className="group relative bg-gradient-to-br from-[#2D5BFF] via-[#1254FF] to-[#0038D1] rounded-2xl p-7 text-white shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[250px]"
                 >
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-primary" />
+                    {/* Subtle decorative background glow */}
+                    <div className="absolute -top-12 -right-12 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
                     <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-primary-16 text-primary flex items-center justify-center font-bold">
+                        <div className="flex items-center justify-between mb-5">
+                            <div className="w-12 h-12 rounded-xl bg-white/20 text-white backdrop-blur-xs flex items-center justify-center font-bold border border-white/30 shadow-inner">
                                 <UserIcon className="w-6 h-6" />
                             </div>
-                            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-primary-16 text-primary">
+                            <span className="px-3 py-1 text-xs font-bold rounded-full bg-white/20 text-white backdrop-blur-xs border border-white/30 tracking-wide uppercase">
                                 System Core
                             </span>
                         </div>
-                        <h2 className="text-xl font-bold text-heading group-hover:text-primary transition-colors">
+                        <h2 className="text-2xl font-black text-white tracking-tight">
                             Admin Dashboard
                         </h2>
-                        <p className="text-sm text-gray mt-2 leading-relaxed">
+                        <p className="text-sm text-blue-100/90 mt-2 leading-relaxed">
                             Manage student directory, user roles, faculty privileges, course enrollments, and system accounts.
                         </p>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-disabled/40 flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-xs text-gray">
+                    <div className="mt-8 pt-4 border-t border-white/20 flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-xs text-blue-100">
                             <div>
-                                <span className="font-semibold text-heading">{metrics?.totalUsers || 0}</span> Total Users
+                                <span className="font-bold text-white text-sm">{metrics?.totalUsers || 0}</span> Total Users
                             </div>
                             <div>
-                                <span className="font-semibold text-heading">{metrics?.activeStudents || 0}</span> Students
+                                <span className="font-bold text-white text-sm">{metrics?.activeStudents || 0}</span> Students
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-primary group-hover:translate-x-1 transition-transform">
+                        <div className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3.5 py-1.5 rounded-lg border border-white/30 transition-all group-hover:translate-x-1">
                             <span>Open Dashboard</span>
                             <ArrowRightIcon className="w-4 h-4" />
                         </div>
                     </div>
                 </div>
 
-                {/* Module 2: Lead Management & Admissions */}
+                {/* Module 2: Lead Management (Fully Colored Warm Amber-Orange Card) */}
                 <div
                     onClick={() => onSelectModule('leads')}
-                    className="group relative bg-white border border-disabled rounded-2xl p-6 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer overflow-hidden flex flex-col justify-between"
+                    className="group relative bg-gradient-to-br from-[#FF842B] via-[#E06A19] to-[#B84500] rounded-2xl p-7 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[250px]"
                 >
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-amber-500" />
+                    {/* Subtle decorative background glow */}
+                    <div className="absolute -top-12 -right-12 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
                     <div>
-                        <div className="flex items-center justify-between mb-4">
-                            <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center font-bold">
+                        <div className="flex items-center justify-between mb-5">
+                            <div className="w-12 h-12 rounded-xl bg-white/20 text-white backdrop-blur-xs flex items-center justify-center font-bold border border-white/30 shadow-inner">
                                 <ClockIcon className="w-6 h-6" />
                             </div>
-                            <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-amber-100 text-amber-800">
+                            <span className="px-3 py-1 text-xs font-bold rounded-full bg-white/20 text-white backdrop-blur-xs border border-white/30 tracking-wide uppercase">
                                 Admissions Funnel
                             </span>
                         </div>
-                        <h2 className="text-xl font-bold text-heading group-hover:text-amber-700 transition-colors">
+                        <h2 className="text-2xl font-black text-white tracking-tight">
                             Lead Management
                         </h2>
-                        <p className="text-sm text-gray mt-2 leading-relaxed">
+                        <p className="text-sm text-orange-100/90 mt-2 leading-relaxed">
                             Front desk clerk intake, calling desk queue, WhatsApp outreach, entrance test handovers, and conversion tracking.
                         </p>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-disabled/40 flex items-center justify-between">
-                        <div className="flex items-center gap-4 text-xs text-gray">
+                    <div className="mt-8 pt-4 border-t border-white/20 flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-xs text-orange-100">
                             <div>
-                                <span className="font-semibold text-heading">{metrics?.totalLeads || 0}</span> Enquiries
+                                <span className="font-bold text-white text-sm">{metrics?.totalLeads || 0}</span> Enquiries
                             </div>
                             <div>
-                                <span className="font-semibold text-amber-700">{metrics?.dueCalls || 0}</span> Calls Due
+                                <span className="font-bold text-white text-sm">{metrics?.dueCalls || 0}</span> Calls Due
                             </div>
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-700 group-hover:translate-x-1 transition-transform">
+                        <div className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3.5 py-1.5 rounded-lg border border-white/30 transition-all group-hover:translate-x-1">
                             <span>Open Lead Desk</span>
                             <ArrowRightIcon className="w-4 h-4" />
                         </div>
