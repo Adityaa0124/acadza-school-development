@@ -1,0 +1,9 @@
+{
+  "name": "acadza-school-development",
+  "version": "1.0.0",
+  "description": "Acadza Schools full-stack application",
+  "scripts": {
+    "build": "cd backend && npm install",
+    "start": "cd backend && node app.js"
+  }
+}
