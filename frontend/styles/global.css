@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * The `btn` family of student-frontend, reduced to the two variants the auth screens ask for
+ * (`primary` and the `lg` size) plus the disabled state. Kept as component classes rather than
+ * inlined utilities so `<Button size="lg">` here means what it means there.
+ */
+@layer components {
+    .btn {
+        @apply inline-flex items-center justify-center rounded-lg font-bold tracking-wide transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary;
+    }
+    .btn-primary {
+        @apply bg-primary text-white hover:bg-primary-64;
+    }
+    .btn-primary:disabled {
+        @apply bg-disabled text-gray cursor-not-allowed hover:bg-disabled;
+    }
+    .btn-sm {
+        @apply h-10 px-5 text-sm;
+    }
+    .btn-lg {
+        @apply h-14 w-full px-6 text-base;
+    }
+    .btn-link {
+        @apply text-primary underline;
+    }
+}
+
+body {
+    @apply bg-white text-black;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
