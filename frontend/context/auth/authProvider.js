@@ -106,6 +106,70 @@ function AuthProvider(props) {
         setLoading(false);
     };
 
+    /*
+     * DUMMY / DEMO LOGIN — FRONTEND ONLY, NO BACKEND OR MongoDB NEEDED.
+     *
+     * This is a temporary shortcut for trying the dashboard without going through OTP
+     * registration. It reuses the exact same state changes as the real `login()` above, so the
+     * dashboard, the reload-from-cookie path and `logout()` all behave identically. The token is
+     * a placeholder string, not a signed JWT: `POST /user/details` will reject it, which is fine
+     * because nothing on the dashboard calls that endpoint.
+     */
+    const demoLogin = async () => {
+        initProcess();
+
+        const demoUser = {
+            _id: 'demo-user',
+            name: 'Demo Student',
+            username: 'Acadza-User-Demo',
+            email: 'demo@acadza.com',
+            phone: '0000000000',
+            role: 'student',
+            course: 'JEE',
+            planType: 'silver',
+            emailVerified: true,
+            phoneVerified: true,
+        };
+        const demoToken = 'demo-token';
+
+        axiosInstance.defaults.headers['Authorization'] = 'Bearer ' + demoToken;
+
+        await handleUser(demoUser);
+        handleAuthToken(demoToken, demoUser.emailVerified, demoUser.phoneVerified);
+        handleToken(demoToken);
+
+        setLoading(false);
+    };
+
+    /*
+     * DEMO ADMIN LOGIN — SHORTCUT FOR TRYING THE ADMIN DASHBOARD
+     */
+    const demoAdminLogin = async () => {
+        initProcess();
+
+        const demoAdmin = {
+            _id: 'demo-admin-id',
+            name: 'System Admin',
+            username: 'Acadza-Admin-1',
+            email: 'admin@acadza.com',
+            phone: '9999999999',
+            role: 'superadmin',
+            course: 'JEE',
+            planType: 'platinum',
+            emailVerified: true,
+            phoneVerified: true,
+        };
+        const demoToken = 'demo-admin-token';
+
+        axiosInstance.defaults.headers['Authorization'] = 'Bearer ' + demoToken;
+
+        await handleUser(demoAdmin);
+        handleAuthToken(demoToken, demoAdmin.emailVerified, demoAdmin.phoneVerified);
+        handleToken(demoToken);
+
+        setLoading(false);
+    };
+
     const loadUserData = async () => {
         if (!user?._id) return;
         const res = await axiosInstance.post(API_USER_DETAILS, { userid: user._id }).catch((error) => {
@@ -141,6 +205,8 @@ function AuthProvider(props) {
                 loginError,
 
                 login,
+                demoLogin,
+                demoAdminLogin,
                 logout,
                 loadUserData,
                 handleToken,

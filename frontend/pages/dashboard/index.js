@@ -4,7 +4,7 @@ import { useAuth } from '@context/auth/authContext';
 import Typography from '@components/Custom/Typography';
 import Button from '@components/Custom/Button';
 import Loader2 from '@components/Custom/Loader2';
-import { ROUTE_LOGIN } from '@utils/constants/page_routes';
+import { ROUTE_LOGIN, ROUTE_ADMIN_DASHBOARD } from '@utils/constants/page_routes';
 
 /*
  * The only page behind the sign-in, and it is deliberately one screen: this project exists to
@@ -32,13 +32,32 @@ export default function Dashboard() {
     return (
         <div className="min-h-screen bg-hotlightgreen">
             <header className="flex items-center justify-between bg-white px-5 py-4 md:px-10">
-                <div>
-                    <span className="text-[1.5rem] font-extrabold tracking-wide text-primary">Acadza</span>
-                    <span className="ml-2 text-[0.875rem] text-muted">Schools</span>
+                <div className="flex items-center gap-3">
+                    <div>
+                        <span className="text-[1.5rem] font-extrabold tracking-wide text-primary">Acadza</span>
+                        <span className="ml-2 text-[0.875rem] text-muted">Schools</span>
+                    </div>
+                    {['superadmin', 'admin', 'staff'].includes(user?.role) && (
+                        <span className="rounded bg-primary-16 px-2.5 py-0.5 text-[0.75rem] font-bold text-primary">
+                            Staff / Admin
+                        </span>
+                    )}
                 </div>
-                <Button type="button" size="sm" onClick={handleLogout} className="w-auto">
-                    Logout
-                </Button>
+                <div className="flex items-center gap-3">
+                    {['superadmin', 'admin', 'staff'].includes(user?.role) && (
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => router.push(ROUTE_ADMIN_DASHBOARD)}
+                            className="w-auto"
+                        >
+                            Admin Dashboard
+                        </Button>
+                    )}
+                    <Button type="button" size="sm" color="link" onClick={handleLogout} className="w-auto text-black">
+                        Logout
+                    </Button>
+                </div>
             </header>
 
             <main className="mx-auto max-w-3xl px-5 py-16 md:py-24">

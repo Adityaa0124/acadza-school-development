@@ -1,0 +1,24 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      # Set this in the repo-root .env file (see .env.docker.example).
+      # For Atlas it is a mongodb+srv://... connection string.
+      MONGO_DEV_URI: ${MONGO_DEV_URI}
+      TOKEN_SECRET: ${TOKEN_SECRET:-change-me-to-a-long-random-string}
+      OTP_DEV_CODE: 123456
+      PORT: 4000
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"

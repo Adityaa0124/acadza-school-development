@@ -8,7 +8,7 @@ import Loader2 from '@components/Custom/Loader2';
 import { useAuth } from '@context/auth/authContext';
 import { useWindowSize } from '@hooks/useWindowSize';
 import { SCREEN_SIZES } from '@utils/constants/screen_size';
-import { ROUTE_DASHBOARD, ROUTE_SIGNUP } from '@utils/constants/page_routes';
+import { ROUTE_DASHBOARD, ROUTE_ADMIN_DASHBOARD, ROUTE_SIGNUP } from '@utils/constants/page_routes';
 
 /*
  * ONE FIELD FOR THE IDENTIFIER, which is why it is labelled three ways.
@@ -28,7 +28,7 @@ export default function LoginScreen(props) {
     const screenSize = useWindowSize();
     const router = useRouter();
 
-    const { loading, login, loginError, authenticToken } = useAuth();
+    const { loading, login, demoLogin, demoAdminLogin, loginError, authenticToken, user } = useAuth();
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -39,8 +39,11 @@ export default function LoginScreen(props) {
      * effect React is entitled to run twice, and in StrictMode it does.
      */
     useEffect(() => {
-        if (authenticToken) router.push(ROUTE_DASHBOARD);
-    }, [authenticToken, router]);
+        if (authenticToken) {
+            const isAdmin = ['superadmin', 'admin', 'staff'].includes(user?.role);
+            router.push(isAdmin ? ROUTE_ADMIN_DASHBOARD : ROUTE_DASHBOARD);
+        }
+    }, [authenticToken, user, router]);
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -116,6 +119,32 @@ export default function LoginScreen(props) {
                 <Button icon="rightArrowIcon" className="mt-6 flex-row-reverse gap-3" size="lg" disabled={loading}>
                     {loading ? 'Loading...' : 'Continue'}
                 </Button>
+
+                {/* Temporary demo shortcuts: signs in a fake user or admin with no backend call. */}
+                <div className="mt-3 flex gap-3">
+                    <Button
+                        type="button"
+                        color="link"
+                        icon="rightArrowIcon"
+                        className="flex-1 flex-row-reverse gap-2 text-xs"
+                        size="sm"
+                        disabled={loading}
+                        onClick={demoLogin}
+                    >
+                        {loading ? '...' : 'Demo Student'}
+                    </Button>
+                    <Button
+                        type="button"
+                        color="link"
+                        icon="rightArrowIcon"
+                        className="flex-1 flex-row-reverse gap-2 text-xs"
+                        size="sm"
+                        disabled={loading}
+                        onClick={demoAdminLogin}
+                    >
+                        {loading ? '...' : 'Demo Admin'}
+                    </Button>
+                </div>
             </form>
         </div>
     );

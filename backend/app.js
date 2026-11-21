@@ -8,6 +8,8 @@ var cors = require("cors");
 var mongoose = require("mongoose");
 
 var user = require("./routes/user"); // Imports routes for the user
+var admin = require("./routes/admin"); // Imports routes for admin
+var lead = require("./routes/lead"); // Imports routes for admissions leads
 
 var app = express();
 
@@ -29,6 +31,8 @@ db.on("error", console.error.bind(console, "MongoDB connection error:"));
 db.once("open", () => console.log("MongoDB connected"));
 
 app.use("/user", user);
+app.use("/admin", admin);
+app.use("/admin/leads", lead);
 
 app.get("/health", (req, res) => res.json({ ok: true }));
 
