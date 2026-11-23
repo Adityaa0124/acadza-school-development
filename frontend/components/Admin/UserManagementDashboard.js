@@ -11,6 +11,7 @@ export default function UserManagementDashboard({
     onBlockUser,
     onDeleteUser,
     onAddUser,
+    onBackToHub,
 }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [activeTab, setActiveTab] = useState('all');
@@ -76,10 +77,21 @@ export default function UserManagementDashboard({
             {/* Header & New User Action */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-extrabold text-heading tracking-tight">Admin Dashboard</h1>
-                    <p className="text-sm text-gray mt-1">
-                        Manage school enrollment, student directories, and user privileges.
-                    </p>
+                    {onBackToHub && (
+                        <button
+                            onClick={onBackToHub}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-gray hover:text-primary transition-colors mb-2 group cursor-pointer"
+                        >
+                            <span className="text-sm font-bold group-hover:-translate-x-0.5 transition-transform">&larr;</span>
+                            <span>Back to Main Screen</span>
+                        </button>
+                    )}
+                    <div>
+                        <h1 className="text-2xl font-extrabold text-heading tracking-tight">Admin Dashboard</h1>
+                        <p className="text-sm text-gray mt-1">
+                            Manage school enrollment, student directories, and user privileges.
+                        </p>
+                    </div>
                 </div>
                 <button
                     onClick={() => setShowAddModal(true)}

@@ -12,6 +12,7 @@ export default function Directory({
     onSelectLead,
     onNewEnquiry,
     onOpenCallingDesk,
+    onBackToHub,
 }) {
     const [searchTerm, setSearchTerm] = useState('');
     const [stageFilter, setStageFilter] = useState('');
@@ -48,15 +49,26 @@ export default function Directory({
             {/* Header with Navigation Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                        Admissions Office
-                    </span>
-                    <h1 className="text-2xl font-extrabold text-heading tracking-tight mt-0.5">
-                        Enquiries & Leads
-                    </h1>
-                    <p className="text-sm text-gray mt-1">
-                        Find an applicant, review next counseling steps, or intake a new student.
-                    </p>
+                    {onBackToHub && (
+                        <button
+                            onClick={onBackToHub}
+                            className="inline-flex items-center gap-1.5 text-xs font-bold text-gray hover:text-primary transition-colors mb-2 group cursor-pointer"
+                        >
+                            <span className="text-sm font-bold group-hover:-translate-x-0.5 transition-transform">&larr;</span>
+                            <span>Back to Main Screen</span>
+                        </button>
+                    )}
+                    <div>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                            Admissions Office
+                        </span>
+                        <h1 className="text-2xl font-extrabold text-heading tracking-tight mt-0.5">
+                            Enquiries & Leads
+                        </h1>
+                        <p className="text-sm text-gray mt-1">
+                            Find an applicant, review next counseling steps, or intake a new student.
+                        </p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <button

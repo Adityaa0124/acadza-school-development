@@ -381,9 +381,10 @@ export default function AdminPage() {
                         {view !== 'hub' && (
                             <button
                                 onClick={() => setView('hub')}
-                                className="px-3 py-1.5 rounded-lg border border-disabled bg-white hover:bg-disabled/20 font-semibold text-heading transition-colors"
+                                className="px-3.5 py-1.5 rounded-lg border border-primary/30 bg-primary-16 hover:bg-primary-64/20 font-bold text-primary transition-colors cursor-pointer inline-flex items-center gap-1.5"
                             >
-                                &larr; Switch Module
+                                <span>&larr;</span>
+                                <span>Back to Main Screen</span>
                             </button>
                         )}
                         <button
@@ -423,6 +424,7 @@ export default function AdminPage() {
                         onBlockUser={handleUserBlock}
                         onDeleteUser={handleUserDelete}
                         onAddUser={handleAddUser}
+                        onBackToHub={() => setView('hub')}
                     />
                 )}
 
@@ -436,6 +438,7 @@ export default function AdminPage() {
                         }}
                         onNewEnquiry={() => setView('add_enquiry')}
                         onOpenCallingDesk={() => setView('caller')}
+                        onBackToHub={() => setView('hub')}
                     />
                 )}
 
