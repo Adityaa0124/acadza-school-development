@@ -14,6 +14,7 @@ import Directory from '@components/Admin/LeadManagement/Directory';
 import CallingDesk from '@components/Admin/LeadManagement/CallingDesk';
 import AddEnquiry from '@components/Admin/LeadManagement/AddEnquiry';
 import LeadDetail from '@components/Admin/LeadManagement/LeadDetail';
+import CBTConductDesk from '@components/Admin/LeadManagement/CBTConductDesk';
 
 // Domain constants and seed fixtures
 import { INITIAL_ADMISSIONS_LEADS, INITIAL_USERS } from '@components/Admin/constants';
@@ -248,6 +249,40 @@ export default function AdminPage() {
         await addLeadNote(leadId, noteText);
     };
 
+    // Handler: CBT Conductivity actions (scheduling, attendance marking, rescheduling)
+    const handleSaveCBTAction = async (leadId, cbtPayload) => {
+        setLeads((prev) =>
+            prev.map((lead) => {
+                if (lead.id !== leadId) return lead;
+                const newHistoryItem = {
+                    id: `act-${Date.now()}`,
+                    at: new Date().toISOString(),
+                    actor: user?.name || 'CBT Conductivity Team',
+                    text: cbtPayload.note
+                        ? `${cbtPayload.outcome}. ${cbtPayload.note}`
+                        : cbtPayload.outcome,
+                };
+                return {
+                    ...lead,
+                    stage: cbtPayload.nextStage || lead.stage,
+                    nextAction: cbtPayload.nextAction || lead.nextAction,
+                    due: cbtPayload.due !== undefined ? cbtPayload.due : lead.due,
+                    lastOutcome: cbtPayload.outcome,
+                    history: [...(lead.history || []), newHistoryItem],
+                };
+            })
+        );
+        // Synchronize with database
+        await recordLeadOutcome({
+            id: leadId,
+            outcome: cbtPayload.outcome,
+            note: cbtPayload.note,
+            due: cbtPayload.due,
+            nextStage: cbtPayload.nextStage,
+            nextAction: cbtPayload.nextAction,
+        });
+    };
+
     // Show initial session loader
     if (loading) {
         return (
@@ -369,6 +404,8 @@ export default function AdminPage() {
                                         ? 'Lead Management'
                                         : view === 'caller'
                                         ? 'Calling Desk'
+                                        : view === 'cbt'
+                                        ? 'CBT Conduct Desk'
                                         : view === 'add_enquiry'
                                         ? 'New Enquiry'
                                         : 'Lead Dossier'}
@@ -438,6 +475,7 @@ export default function AdminPage() {
                         }}
                         onNewEnquiry={() => setView('add_enquiry')}
                         onOpenCallingDesk={() => setView('caller')}
+                        onOpenCBTDesk={() => setView('cbt')}
                         onBackToHub={() => setView('hub')}
                     />
                 )}
@@ -447,6 +485,15 @@ export default function AdminPage() {
                     <CallingDesk
                         leads={leads}
                         onSaveOutcome={handleSaveOutcome}
+                        onBackToDirectory={() => setView('leads')}
+                    />
+                )}
+
+                {/* View 5: CBT Conductivity & Evaluation Desk */}
+                {view === 'cbt' && (
+                    <CBTConductDesk
+                        leads={leads}
+                        onSaveCBTAction={handleSaveCBTAction}
                         onBackToDirectory={() => setView('leads')}
                     />
                 )}

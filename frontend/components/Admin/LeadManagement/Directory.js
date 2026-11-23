@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { PhoneIcon, ClockIcon } from '../icons';
+import { PhoneIcon, ClockIcon, TestDocIcon } from '../icons';
 import WhatsAppContactButton from '../WhatsAppContactButton';
 import { GRADES, STAGE_LABELS, getStageBadgeClasses, formatDateTime } from '../constants';
 
@@ -12,6 +12,7 @@ export default function Directory({
     onSelectLead,
     onNewEnquiry,
     onOpenCallingDesk,
+    onOpenCBTDesk,
     onBackToHub,
 }) {
     const [searchTerm, setSearchTerm] = useState('');
@@ -70,17 +71,24 @@ export default function Directory({
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                        onClick={onOpenCBTDesk}
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                    >
+                        <TestDocIcon className="w-3.5 h-3.5" />
+                        <span>CBT Conduct Desk ({stats.readyForTest} Ready)</span>
+                    </button>
                     <button
                         onClick={onOpenCallingDesk}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
                     >
                         <PhoneIcon className="w-3.5 h-3.5" />
                         <span>Calling Desk ({stats.dueCalls} Due)</span>
                     </button>
                     <button
                         onClick={onNewEnquiry}
-                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-bold transition-colors shadow-sm"
+                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-dark text-white rounded-lg text-xs font-bold transition-colors shadow-sm cursor-pointer"
                     >
                         <span>+ Add Enquiry</span>
                     </button>
