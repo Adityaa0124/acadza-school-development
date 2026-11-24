@@ -387,11 +387,20 @@ export default function SingleStudentCBTModal({
                                             <button
                                                 type="button"
                                                 onClick={handleCopyLink}
-                                                className="px-3 py-1.5 bg-white border border-orange-300 hover:bg-orange-50 text-[#E06A19] rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                                className="px-3 py-1.5 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
                                             >
-                                                <CopyIcon className="w-3.5 h-3.5 text-[#E06A19]" />
+                                                <CopyIcon className="w-3.5 h-3.5" />
                                                 <span>Copy</span>
                                             </button>
+                                            <a
+                                                href={testUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shrink-0"
+                                            >
+                                                <span>Open</span>
+                                                <ArrowRightIcon className="w-3.5 h-3.5" />
+                                            </a>
                                             <WhatsAppContactButton
                                                 phoneNumber={lead.phone}
                                                 studentName={lead.student}

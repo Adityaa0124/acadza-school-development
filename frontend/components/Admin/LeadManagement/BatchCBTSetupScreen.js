@@ -389,14 +389,24 @@ export default function BatchCBTSetupScreen({
 
                                 {/* Link Copy & WhatsApp Buttons */}
                                 {isTestGenerated ? (
-                                    <div className="pt-2 border-t border-disabled/40 flex items-center gap-2">
+                                    <div className="pt-2 border-t border-disabled/40 flex flex-wrap items-center gap-2">
                                         <button
+                                            type="button"
                                             onClick={() => handleCopyStudentLink(cand.id)}
-                                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white border border-orange-200 hover:bg-orange-50 text-[#E06A19] text-[11px] font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 text-[11px] font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
                                         >
-                                            <CopyIcon className="w-3 h-3 text-[#E06A19]" />
+                                            <CopyIcon className="w-3 h-3" />
                                             <span>{isCopied ? 'Copied!' : 'Copy Link'}</span>
                                         </button>
+                                        <a
+                                            href={testUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
+                                        >
+                                            <span>Open in Browser</span>
+                                            <ArrowRightIcon className="w-3 h-3" />
+                                        </a>
                                         <WhatsAppContactButton
                                             phoneNumber={cand.phone}
                                             studentName={cand.student}
