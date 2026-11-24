@@ -1,15 +1,22 @@
 import React, { useState, useMemo } from 'react';
-import { TestDocIcon, ClockIcon, CheckIcon, AlertIcon, ArrowRightIcon, PhoneIcon } from '../icons';
+import { TestDocIcon, ClockIcon, CheckIcon, ArrowRightIcon, PhoneIcon, UserIcon, CopyIcon, AlertIcon } from '../icons';
 import WhatsAppContactButton from '../WhatsAppContactButton';
-import { STAGE_LABELS, getStageBadgeClasses, formatDateTime } from '../constants';
+import { STAGE_LABELS, getStageBadgeClasses, formatDateTime, GRADES } from '../constants';
+import CBTSyllabusModal from './CBTSyllabusModal';
+import CBTTestModal from './CBTTestModal';
+import BatchCBTSetupScreen from './BatchCBTSetupScreen';
+import SingleStudentCBTModal from './SingleStudentCBTModal';
+import { getSyllabusForTargetGrade } from './syllabusData';
+import { generateTestPaper, buildTestShareUrl } from './testGenerator';
 
 /**
- * CBT Conduct Desk Workspace.
- * Enables the examination and test conductivity team to:
- * 1. Select prospective students routed for entrance evaluation.
- * 2. Schedule and reschedule test dates, slots, and lab centers.
- * 3. Manage real-time candidate attendance (Present / Absent / Rescheduled).
- * 4. Log conduct remarks and transition candidates toward test completion.
+ * CBT Conduct & Evaluation Desk Workspace (Row-Wise Layout).
+ * Visually balanced with Acadza's signature brand palette (Royal Blue & Vibrant Orange):
+ * 1. Dual-palette candidate avatars and grade badges prevent monochromatic fatigue.
+ * 2. Tapping any candidate row opens a focused modal popup with full details,
+ *    scheduling, syllabus portion picker, and attendance management.
+ * 3. Multi-selecting students of the same class triggers the dedicated next screen
+ *    (BatchCBTSetupScreen) to configure unified schedule and generate tests for all at once.
  */
 export default function CBTConductDesk({
     leads,
@@ -17,23 +24,27 @@ export default function CBTConductDesk({
     onBackToDirectory,
 }) {
     const [activeTab, setActiveTab] = useState('ready'); // 'ready' | 'scheduled' | 'completed'
-    const [selectedLeadId, setSelectedLeadId] = useState('');
+    const [gradeFilter, setGradeFilter] = useState(''); // '' = All Grades
+    const [searchTerm, setSearchTerm] = useState('');
+    const [batchSelectedIds, setBatchSelectedIds] = useState([]);
+    const [isBatchViewActive, setIsBatchViewActive] = useState(false);
 
-    // Schedule form state
-    const [testDateTime, setTestDateTime] = useState(() => {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        tomorrow.setHours(10, 0, 0, 0);
-        return tomorrow.toISOString().slice(0, 16);
-    });
-    const [testCenter, setTestCenter] = useState('Campus Computer Lab A (Ground Floor)');
-    const [testSubject, setTestSubject] = useState('JEE Foundation (Physics, Chemistry, Maths)');
-    const [invigilator, setInvigilator] = useState('Prof. S. R. Verma');
+    // Single student modal state
+    const [singleStudentModalLead, setSingleStudentModalLead] = useState(null);
+    const activeSingleLead = useMemo(() => {
+        if (!singleStudentModalLead) return null;
+        return leads.find((l) => l.id === singleStudentModalLead.id) || singleStudentModalLead;
+    }, [leads, singleStudentModalLead]);
 
-    // Attendance form state
-    const [attendanceStatus, setAttendanceStatus] = useState('Present');
-    const [conductNote, setConductNote] = useState('');
-    const [markCompleteOnPresent, setMarkCompleteOnPresent] = useState(false);
+    // Syllabus Modal State
+    const [isSyllabusModalOpen, setIsSyllabusModalOpen] = useState(false);
+    const [modalTargetGrade, setModalTargetGrade] = useState('7');
+    const [modalCandidates, setModalCandidates] = useState([]);
+
+    // Test Paper & Link Modal State
+    const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+    const [activeTestPaper, setActiveTestPaper] = useState(null);
+    const [testModalCandidate, setTestModalCandidate] = useState(null);
 
     // Group leads into CBT lifecycle buckets
     const buckets = useMemo(() => {
@@ -43,161 +54,269 @@ export default function CBTConductDesk({
         return { ready, scheduled, completed };
     }, [leads]);
 
-    const currentQueue =
-        activeTab === 'ready' ? buckets.ready : activeTab === 'scheduled' ? buckets.scheduled : buckets.completed;
+    // Active tab queue filtered by Grade and Search term
+    const currentQueue = useMemo(() => {
+        const base =
+            activeTab === 'ready'
+                ? buckets.ready
+                : activeTab === 'scheduled'
+                ? buckets.scheduled
+                : buckets.completed;
 
-    // Determine currently active candidate
-    const activeLead = useMemo(() => {
-        if (selectedLeadId) {
-            const found = leads.find((l) => l.id === selectedLeadId);
-            if (found) return found;
+        let filtered = base;
+        if (gradeFilter) {
+            filtered = filtered.filter((l) => String(l.grade) === String(gradeFilter));
         }
-        return currentQueue[0] || null;
-    }, [leads, selectedLeadId, currentQueue]);
+        if (searchTerm.trim()) {
+            const query = searchTerm.toLowerCase().trim();
+            filtered = filtered.filter(
+                (l) =>
+                    l.student?.toLowerCase().includes(query) ||
+                    l.parent?.toLowerCase().includes(query) ||
+                    l.phone?.includes(query) ||
+                    l.id?.toLowerCase().includes(query)
+            );
+        }
+        return filtered;
+    }, [activeTab, buckets, gradeFilter, searchTerm]);
 
-    const handleSelectLead = (lead) => {
-        setSelectedLeadId(lead.id);
-        setConductNote('');
-        setAttendanceStatus('Present');
-        setMarkCompleteOnPresent(false);
+    // A batch may only contain students of ONE class. The class is locked in by the first
+    // student selected; students of any other class stay disabled until selection is cleared.
+    const [selectionNotice, setSelectionNotice] = useState('');
+    const selectionGrade = useMemo(() => {
+        if (batchSelectedIds.length === 0) return null;
+        const first = leads.find((l) => l.id === batchSelectedIds[0]);
+        return first ? String(first.grade) : null;
+    }, [batchSelectedIds, leads]);
+
+    // Rows that "Select All" is allowed to pick: same class as the current selection, or
+    // (with nothing selected) the Grade filter's class, or the class of the first row.
+    const selectableQueue = useMemo(() => {
+        const grade = selectionGrade || (currentQueue[0] ? String(currentQueue[0].grade) : null);
+        return grade ? currentQueue.filter((l) => String(l.grade) === grade) : [];
+    }, [currentQueue, selectionGrade]);
+
+    const allSelectableChecked =
+        selectableQueue.length > 0 && selectableQueue.every((l) => batchSelectedIds.includes(l.id));
+
+    // Multi-Select handlers
+    const handleToggleBatchCandidate = (lead, e) => {
+        e.stopPropagation();
+        const leadId = lead.id;
+        if (batchSelectedIds.includes(leadId)) {
+            setBatchSelectedIds((prev) => prev.filter((id) => id !== leadId));
+            setSelectionNotice('');
+            return;
+        }
+        if (selectionGrade && String(lead.grade) !== selectionGrade) {
+            setSelectionNotice(
+                `Tests can only be set up for one class at a time. You have Grade ${selectionGrade} selected — clear the selection to pick a Grade ${lead.grade} student.`
+            );
+            return;
+        }
+        setSelectionNotice('');
+        setBatchSelectedIds((prev) => [...prev, leadId]);
     };
 
-    // Handler: Schedule or Reschedule the entrance test
-    const handleScheduleTest = (e) => {
-        e.preventDefault();
-        if (!activeLead) return;
+    const handleSelectAllInQueue = () => {
+        setSelectionNotice('');
+        if (allSelectableChecked) {
+            setBatchSelectedIds([]);
+        } else {
+            setBatchSelectedIds(selectableQueue.map((l) => l.id));
+        }
+    };
 
-        const scheduledDateISO = new Date(testDateTime).toISOString();
-        const formattedDate = formatDateTime(scheduledDateISO);
-        const actionLabel = `Attend CBT Test (${formattedDate}) at ${testCenter}`;
+    const clearBatchSelection = () => {
+        setBatchSelectedIds([]);
+        setSelectionNotice('');
+    };
 
-        onSaveCBTAction(activeLead.id, {
-            nextStage: 'CBT_SCHEDULED',
-            nextAction: actionLabel,
-            due: scheduledDateISO,
-            outcome: `CBT Scheduled for ${formattedDate} (${testCenter})`,
-            note: `Scheduled by CBT Conductivity Team. Subject: ${testSubject}. Invigilator: ${invigilator}.`,
-            isScheduleAction: true,
+    // Open Single Student Modal
+    const handleOpenStudentModal = (lead) => {
+        setSingleStudentModalLead(lead);
+    };
+
+    // Open syllabus modal for candidate
+    const handleOpenSyllabusModalForLead = (lead) => {
+        setModalTargetGrade(lead.grade || '7');
+        setModalCandidates([lead]);
+        setIsSyllabusModalOpen(true);
+    };
+
+    // Open test paper modal for candidate
+    const handleOpenTestModalForLead = (lead) => {
+        setTestModalCandidate(lead);
+        if (lead.testPaper) {
+            setActiveTestPaper(lead.testPaper);
+        } else {
+            const paper = generateTestPaper({
+                targetGrade: lead.grade,
+                testConfig: lead.testConfig,
+                studentId: lead.id,
+                studentName: lead.student,
+            });
+            setActiveTestPaper(paper);
+        }
+        setIsTestModalOpen(true);
+    };
+
+    // Handler: Save syllabus portion configuration from modal
+    const handleSavePortion = (portionConfig) => {
+        const candidateIdsToUpdate =
+            modalCandidates.length > 0 ? modalCandidates.map((c) => c.id) : [];
+
+        candidateIdsToUpdate.forEach((leadId) => {
+            onSaveCBTAction(leadId, {
+                testConfig: portionConfig,
+                outcome: `Configured CBT Portion: ${portionConfig.summaryLabel}`,
+                note: `Evaluated on Grade ${portionConfig.testGrade} Standard. Presets: ${portionConfig.preset}.`,
+                nextAction: 'Entrance test portion locked',
+            });
         });
 
-        setConductNote('');
-        // Switch tab to scheduled so staff sees candidate in the scheduled queue
-        setActiveTab('scheduled');
-        setSelectedLeadId(activeLead.id);
+        setIsSyllabusModalOpen(false);
     };
 
-    // Handler: Manage candidate attendance & test conduct
-    const handleSaveAttendance = (e) => {
-        e.preventDefault();
-        if (!activeLead) return;
+    // Handler: Attach test paper to candidate
+    const handleAttachTestPaper = (paper) => {
+        if (!testModalCandidate) return;
 
-        let nextStage = activeLead.stage;
-        let nextAction = activeLead.nextAction;
-        let scheduledDue = activeLead.due;
-
-        if (attendanceStatus === 'Present') {
-            if (markCompleteOnPresent) {
-                nextStage = 'CBT_COMPLETED';
-                nextAction = 'Evaluate CBT Scores & Prepare Rank';
-            } else {
-                nextAction = 'CBT In Progress - Candidate Present';
-            }
-        } else if (attendanceStatus === 'Absent') {
-            nextAction = 'Candidate Absent - Follow up for Reschedule';
-        } else if (attendanceStatus === 'Rescheduled') {
-            nextStage = 'READY_FOR_CBT';
-            nextAction = 'Reschedule CBT Test Date';
-            scheduledDue = null;
-        }
-
-        onSaveCBTAction(activeLead.id, {
-            nextStage,
-            nextAction,
-            due: scheduledDue,
-            outcome: `CBT Attendance: ${attendanceStatus}`,
-            note: conductNote.trim()
-                ? `Attendance: ${attendanceStatus}. Remarks: ${conductNote.trim()}`
-                : `Attendance marked as ${attendanceStatus} by CBT Conduct Team.`,
-            isAttendanceAction: true,
+        onSaveCBTAction(testModalCandidate.id, {
+            testPaper: paper,
+            nextStage: testModalCandidate.stage === 'READY_FOR_CBT' ? 'CBT_SCHEDULED' : testModalCandidate.stage,
+            outcome: `CBT Test Created: ${paper.testId}`,
+            note: `Duration: ${paper.durationMinutes}m. Total Questions: ${paper.totalQuestions} (${paper.totalMarks} Marks). Evaluated on Grade ${paper.testGrade} Syllabus.`,
+            nextAction: 'Send CBT link to candidate',
         });
 
-        setConductNote('');
+        setIsTestModalOpen(false);
     };
+
+    // Handler: Batch save test paper, syllabus config & schedule date to all candidates
+    const handleSaveBatch = ({ candidateIds, testConfig, testPaper, schedulePayload }) => {
+        candidateIds.forEach((leadId) => {
+            onSaveCBTAction(leadId, {
+                testConfig,
+                testPaper,
+                due: schedulePayload.due,
+                outcome: schedulePayload.outcome,
+                note: schedulePayload.note,
+                nextStage: schedulePayload.nextStage,
+                nextAction: schedulePayload.nextAction,
+            });
+        });
+    };
+
+    // Helper: Blue-led palette. Orange is reserved for a few small accents only.
+    const getAvatarClasses = () => 'bg-blue-100 text-blue-800 border border-blue-200';
+
+    const getGradeBadgeStyle = (grade) =>
+        Number(grade) >= 11
+            ? 'bg-blue-50 text-blue-700 border-blue-200'
+            : 'bg-slate-50 text-slate-700 border-slate-200';
+
+    // Render Dedicated Batch CBT Setup Screen when activated
+    if (isBatchViewActive && batchSelectedIds.length > 0) {
+        const batchCandidates = leads.filter((l) => batchSelectedIds.includes(l.id));
+        return (
+            <BatchCBTSetupScreen
+                selectedCandidates={batchCandidates}
+                onSaveBatch={handleSaveBatch}
+                onBack={() => setIsBatchViewActive(false)}
+            />
+        );
+    }
 
     return (
         <div className="space-y-6">
-            {/* Header with Navigation & Quick Metrics */}
+            {/* Header with Navigation & Dual-Tone Brand Elements */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <button
                         onClick={onBackToDirectory}
-                        className="text-xs font-semibold text-gray hover:text-heading flex items-center gap-1 mb-1 transition-colors group cursor-pointer"
+                        className="text-xs font-semibold text-gray hover:text-heading flex items-center gap-1.5 mb-1.5 transition-colors group cursor-pointer"
                     >
                         <span className="group-hover:-translate-x-0.5 transition-transform">&larr;</span>
                         <span>Back to Enquiries Directory</span>
                     </button>
-                    <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
-                            <TestDocIcon className="w-4 h-4" />
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-700 text-white flex items-center justify-center font-bold shadow-sm ring-2 ring-[#E06A19]/25">
+                            <TestDocIcon className="w-5 h-5" />
                         </div>
-                        <h1 className="text-2xl font-extrabold text-heading tracking-tight">
-                            CBT Conduct & Evaluation Desk
-                        </h1>
+                        <div>
+                            <h1 className="text-xl font-black text-heading tracking-tight">
+                                CBT Conduct & Evaluation Desk
+                            </h1>
+                            <p className="text-xs text-gray mt-0.5">
+                                Tap any student row to view & manage details, or select multiple students of the same class to create batch tests.
+                            </p>
+                        </div>
                     </div>
-                    <p className="text-sm text-gray mt-1">
-                        Schedule entrance tests, manage candidate attendance, and reschedule evaluations for prospective students.
-                    </p>
                 </div>
 
-                {/* Team Status Indicators */}
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-xs font-bold bg-white border border-disabled rounded-lg px-3.5 py-2 shadow-xs">
-                        <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-                        <span>CBT Pipeline: {buckets.ready.length + buckets.scheduled.length} Active Candidates</span>
+                {/* Quick Pipeline KPI Badges (Blue + Orange + Green Harmony) */}
+                <div className="flex items-center gap-2 text-xs">
+                    <div className="px-3 py-1.5 rounded-xl bg-white border border-disabled flex items-center gap-2 shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-[#E06A19] animate-pulse" />
+                        <span className="text-gray font-medium">Ready:</span>
+                        <strong className="text-heading font-black">{buckets.ready.length}</strong>
+                    </div>
+                    <div className="px-3 py-1.5 rounded-xl bg-blue-50/80 border border-blue-200 flex items-center gap-2 shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                        <span className="text-blue-700 font-medium">Scheduled:</span>
+                        <strong className="text-heading font-black">{buckets.scheduled.length}</strong>
+                    </div>
+                    <div className="px-3 py-1.5 rounded-xl bg-emerald-50/80 border border-emerald-200 flex items-center gap-2 shadow-2xs">
+                        <span className="w-2 h-2 rounded-full bg-green" />
+                        <span className="text-emerald-700 font-medium">Completed:</span>
+                        <strong className="text-heading font-black">{buckets.completed.length}</strong>
                     </div>
                 </div>
             </div>
 
-            {/* Main CBT Workspace Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                {/* Left Column: Candidate Queue Selector */}
-                <div className="lg:col-span-4 bg-white border border-disabled rounded-2xl shadow-sm overflow-hidden">
-                    {/* Queue Tabs */}
-                    <div className="grid grid-cols-3 border-b border-disabled text-center text-xs font-bold">
+            {/* Filter Strip & Tabs */}
+            <div className="bg-white border border-disabled rounded-2xl shadow-xs p-4 space-y-3.5">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    {/* Lifecycle Tabs (Color-coded by stage) */}
+                    <div className="inline-flex p-1 rounded-xl bg-disabled/30 text-xs font-bold">
                         <button
+                            type="button"
                             onClick={() => {
                                 setActiveTab('ready');
-                                setSelectedLeadId('');
+                                setBatchSelectedIds([]);
                             }}
-                            className={`py-3 transition-colors ${
+                            className={`px-4 py-2 rounded-lg transition-all cursor-pointer ${
                                 activeTab === 'ready'
-                                    ? 'bg-amber-50 text-amber-800 border-b-2 border-amber-600'
+                                    ? 'bg-white text-blue-700 shadow-xs'
                                     : 'text-gray hover:text-heading'
                             }`}
                         >
-                            Awaiting ({buckets.ready.length})
+                            Awaiting Test ({buckets.ready.length})
                         </button>
                         <button
+                            type="button"
                             onClick={() => {
                                 setActiveTab('scheduled');
-                                setSelectedLeadId('');
+                                setBatchSelectedIds([]);
                             }}
-                            className={`py-3 transition-colors ${
+                            className={`px-4 py-2 rounded-lg transition-all cursor-pointer ${
                                 activeTab === 'scheduled'
-                                    ? 'bg-indigo-50 text-indigo-700 border-b-2 border-indigo-600'
+                                    ? 'bg-white text-blue-700 shadow-xs'
                                     : 'text-gray hover:text-heading'
                             }`}
                         >
                             Scheduled ({buckets.scheduled.length})
                         </button>
                         <button
+                            type="button"
                             onClick={() => {
                                 setActiveTab('completed');
-                                setSelectedLeadId('');
+                                setBatchSelectedIds([]);
                             }}
-                            className={`py-3 transition-colors ${
+                            className={`px-4 py-2 rounded-lg transition-all cursor-pointer ${
                                 activeTab === 'completed'
-                                    ? 'bg-green-50 text-green border-b-2 border-green'
+                                    ? 'bg-white text-emerald-700 shadow-xs'
                                     : 'text-gray hover:text-heading'
                             }`}
                         >
@@ -205,308 +324,305 @@ export default function CBTConductDesk({
                         </button>
                     </div>
 
-                    {/* Candidate Queue List */}
-                    <div className="divide-y divide-disabled/40 max-h-[640px] overflow-y-auto">
-                        {currentQueue.length === 0 ? (
-                            <div className="py-14 px-4 text-center">
-                                <CheckIcon className="w-8 h-8 mx-auto text-green" />
-                                <div className="text-xs font-bold text-heading mt-2">Queue is clear!</div>
-                                <div className="text-[11px] text-gray mt-1">
-                                    No candidates currently in the {activeTab} stage.
-                                </div>
-                            </div>
-                        ) : (
-                            currentQueue.map((lead) => {
-                                const isSelected = activeLead?.id === lead.id;
-                                return (
-                                    <div
-                                        key={lead.id}
-                                        onClick={() => handleSelectLead(lead)}
-                                        className={`p-4 cursor-pointer transition-colors ${
-                                            isSelected ? 'bg-indigo-50/70 border-l-4 border-indigo-600' : 'hover:bg-disabled/15'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="font-bold text-xs text-heading">{lead.student}</span>
-                                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-disabled/40 text-gray">
-                                                Grade {lead.grade}
-                                            </span>
-                                        </div>
-                                        <div className="text-xs text-gray mt-1">
-                                            Parent: <span className="text-heading font-medium">{lead.parent}</span>
-                                        </div>
-                                        <div className="flex items-center justify-between text-[11px] text-gray mt-2">
-                                            <span className="font-mono">{lead.id}</span>
-                                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${getStageBadgeClasses(lead.stage)}`}>
-                                                {STAGE_LABELS[lead.stage] || lead.stage}
-                                            </span>
-                                        </div>
-                                        {lead.due && (
-                                            <div className="text-[11px] text-indigo-700 font-medium mt-1.5 flex items-center gap-1">
-                                                <ClockIcon className="w-3 h-3" />
-                                                <span>{formatDateTime(lead.due)}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })
+                    {/* Grade Filter & Search Input */}
+                    <div className="flex flex-wrap items-center gap-2.5">
+                        <select
+                            value={gradeFilter}
+                            onChange={(e) => {
+                                setGradeFilter(e.target.value);
+                                setBatchSelectedIds([]);
+                            }}
+                            className="text-xs bg-disabled/20 border border-disabled rounded-lg px-3 py-2 font-bold text-heading focus:outline-none focus:border-blue-600"
+                        >
+                            <option value="">All Grades</option>
+                            {GRADES.map((g) => (
+                                <option key={g} value={g}>
+                                    Grade {g}
+                                </option>
+                            ))}
+                        </select>
+
+                        <div className="relative">
+                            <input
+                                type="text"
+                                placeholder="Search student, parent, phone..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-56 sm:w-64 pl-3 pr-3 py-2 text-xs bg-disabled/20 border border-disabled rounded-lg text-heading placeholder-gray focus:outline-none focus:border-blue-600"
+                            />
+                        </div>
+
+                        {currentQueue.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleSelectAllInQueue}
+                                className="text-xs font-bold text-blue-700 hover:text-blue-900 px-2 py-1.5 transition-colors cursor-pointer"
+                            >
+                                {allSelectableChecked
+                                    ? 'Deselect All'
+                                    : `Select All${
+                                          selectableQueue.length < currentQueue.length && selectableQueue[0]
+                                              ? ` Grade ${selectableQueue[0].grade}`
+                                              : ''
+                                      } (${selectableQueue.length})`}
+                            </button>
                         )}
                     </div>
                 </div>
 
-                {/* Right Column: CBT Management Console */}
-                <div className="lg:col-span-8 bg-white border border-disabled rounded-2xl p-6 shadow-sm">
-                    {!activeLead ? (
-                        <div className="py-20 text-center text-gray text-xs">
-                            Select a candidate from the queue on the left to manage CBT scheduling or attendance.
+                {/* Floating Batch Action Strip (Dual Blue + Orange Accent) */}
+                {batchSelectedIds.length > 0 && (
+                    <div className="p-3.5 bg-blue-50/60 border border-blue-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in duration-100 shadow-xs">
+                        <div className="flex items-center gap-2.5">
+                            <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                            <div>
+                                <span className="text-xs font-black text-blue-950 block">
+                                    {batchSelectedIds.length} Student{batchSelectedIds.length === 1 ? '' : 's'} Selected
+                                    {selectionGrade ? ` · Grade ${selectionGrade}` : ''}
+                                </span>
+                                <span className={`text-[11px] ${selectionNotice ? 'text-red-600 font-semibold' : 'text-gray'}`}>
+                                    {selectionNotice ||
+                                        'Configure uniform schedule, syllabus portion, and generate tests at once (one class per batch).'}
+                                </span>
+                            </div>
                         </div>
-                    ) : (
-                        <div className="space-y-6">
-                            {/* Candidate Identity Header */}
-                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between pb-5 border-b border-disabled/40 gap-4">
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-xs font-mono text-gray">{activeLead.id}</span>
-                                        <span className={`px-2.5 py-0.5 text-[10px] font-bold rounded-full border ${getStageBadgeClasses(activeLead.stage)}`}>
-                                            {STAGE_LABELS[activeLead.stage] || activeLead.stage}
-                                        </span>
-                                    </div>
-                                    <h2 className="text-2xl font-black text-heading mt-1">{activeLead.student}</h2>
-                                    <div className="text-xs text-gray mt-0.5">
-                                        Candidate for <span className="font-semibold text-heading">Grade {activeLead.grade}</span> &bull; Academic Cycle {activeLead.cycle} &bull; Channel: {activeLead.source}
-                                    </div>
-                                </div>
 
-                                {/* Direct Parent Contact */}
-                                <div className="flex items-center gap-2">
-                                    <WhatsAppContactButton lead={activeLead} />
-                                    <a
-                                        href={`tel:${activeLead.phone}`}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-dark transition-colors shadow-sm"
-                                    >
-                                        <PhoneIcon className="w-4 h-4" />
-                                        <span>Call Parent</span>
-                                    </a>
-                                </div>
-                            </div>
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <button
+                                type="button"
+                                onClick={clearBatchSelection}
+                                className="px-3 py-1.5 bg-white border border-disabled text-gray hover:text-heading rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                            >
+                                Clear Selection
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setIsBatchViewActive(true)}
+                                className="inline-flex items-center gap-2 px-4 py-1.5 bg-[#E06A19] hover:bg-[#c85a10] text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                            >
+                                <span>Proceed to Batch Setup ({batchSelectedIds.length})</span>
+                                <ArrowRightIcon className="w-3.5 h-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-                            {/* Contact & Status Strip */}
-                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 bg-disabled/15 rounded-xl p-3 text-xs">
-                                <div>
-                                    <div className="text-[10px] uppercase font-bold text-gray">Parent / Guardian</div>
-                                    <div className="font-bold text-heading mt-0.5">{activeLead.parent}</div>
-                                </div>
-                                <div>
-                                    <div className="text-[10px] uppercase font-bold text-gray">Primary Phone</div>
-                                    <div className="font-bold text-heading mt-0.5">{activeLead.phone}</div>
-                                </div>
-                                <div>
-                                    <div className="text-[10px] uppercase font-bold text-gray">Current Next Step</div>
-                                    <div className="font-medium text-heading mt-0.5 truncate">{activeLead.nextAction || 'Awaiting schedule'}</div>
-                                </div>
-                            </div>
-
-                            {/* Action Block 1: Schedule / Reschedule Entrance Test */}
-                            <div className="bg-indigo-50/50 border border-indigo-200/70 rounded-2xl p-5 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-md bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
-                                            1
+            {/* Row-Wise Candidates Table */}
+            <div className="bg-white border border-disabled rounded-2xl shadow-xs overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                        <thead>
+                            <tr className="border-b border-disabled/70 bg-[#F8FAFC] text-gray uppercase text-[10px] tracking-wider font-bold">
+                                <th className="py-3 px-4 w-12 text-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={allSelectableChecked}
+                                        onChange={handleSelectAllInQueue}
+                                        className="w-4 h-4 rounded accent-blue-600 cursor-pointer"
+                                    />
+                                </th>
+                                <th className="py-3 px-3">Student & ID</th>
+                                <th className="py-3 px-3">Parent & Contact</th>
+                                <th className="py-3 px-3">Target Grade</th>
+                                <th className="py-3 px-3">Current Status</th>
+                                <th className="py-3 px-3">Test Paper & Syllabus</th>
+                                <th className="py-3 px-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-disabled/40 text-heading">
+                            {currentQueue.length === 0 ? (
+                                <tr>
+                                    <td colSpan="7" className="py-14 text-center">
+                                        <CheckIcon className="w-8 h-8 mx-auto text-green" />
+                                        <div className="text-xs font-bold text-heading mt-2">
+                                            No candidates found matching this filter
                                         </div>
-                                        <h3 className="text-sm font-bold text-heading">
-                                            {activeLead.stage === 'CBT_SCHEDULED' ? 'Reschedule Test Date / Center' : 'Schedule Entrance Test'}
-                                        </h3>
-                                    </div>
-                                    {activeLead.stage === 'CBT_SCHEDULED' && (
-                                        <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded">
-                                            Already Scheduled: {formatDateTime(activeLead.due)}
-                                        </span>
-                                    )}
-                                </div>
+                                        <div className="text-[11px] text-gray mt-1">
+                                            Try switching tabs or resetting the Grade filter.
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                currentQueue.map((lead, idx) => {
+                                    const isChecked = batchSelectedIds.includes(lead.id);
+                                    const isOtherClass = !!selectionGrade && String(lead.grade) !== selectionGrade;
+                                    const customWaMsg = `Hello ${lead.parent || 'Parent'}, regarding ${lead.student}'s Grade ${lead.grade} entrance CBT test at Acadza. Status: ${lead.nextAction}.`;
 
-                                <form onSubmit={handleScheduleTest} className="space-y-3 text-xs">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-heading font-bold mb-1">
-                                                Test Date & Time *
-                                            </label>
-                                            <input
-                                                type="datetime-local"
-                                                required
-                                                value={testDateTime}
-                                                onChange={(e) => setTestDateTime(e.target.value)}
-                                                className="w-full border border-disabled rounded-lg px-3 py-2 bg-white text-heading focus:outline-none focus:border-indigo-600"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-heading font-bold mb-1">
-                                                Test Center / Lab Location *
-                                            </label>
-                                            <select
-                                                value={testCenter}
-                                                onChange={(e) => setTestCenter(e.target.value)}
-                                                className="w-full border border-disabled rounded-lg px-3 py-2 bg-white text-heading focus:outline-none focus:border-indigo-600"
-                                            >
-                                                <option value="Campus Computer Lab A (Ground Floor)">Campus Computer Lab A (Ground Floor)</option>
-                                                <option value="Campus Computer Lab B (First Floor)">Campus Computer Lab B (First Floor)</option>
-                                                <option value="Main Auditorium CBT Terminals">Main Auditorium CBT Terminals</option>
-                                                <option value="Online Remote Proctored CBT">Online Remote Proctored CBT</option>
-                                            </select>
-                                        </div>
-                                    </div>
+                                    // Dynamic action button based on candidate stage
+                                    const isReady = lead.stage === 'READY_FOR_CBT';
+                                    const isScheduled = lead.stage === 'CBT_SCHEDULED';
 
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-heading font-bold mb-1">
-                                                Assessment Stream / Subjects
-                                            </label>
-                                            <select
-                                                value={testSubject}
-                                                onChange={(e) => setTestSubject(e.target.value)}
-                                                className="w-full border border-disabled rounded-lg px-3 py-2 bg-white text-heading focus:outline-none focus:border-indigo-600"
-                                            >
-                                                <option value="JEE Foundation (Physics, Chemistry, Maths)">JEE Foundation (Physics, Chemistry, Maths)</option>
-                                                <option value="NEET Foundation (Physics, Chemistry, Biology)">NEET Foundation (Physics, Chemistry, Biology)</option>
-                                                <option value="General Scholastic Aptitude Test (GSAT)">General Scholastic Aptitude Test (GSAT)</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-heading font-bold mb-1">
-                                                Assigned Invigilator / Examiner
-                                            </label>
-                                            <input
-                                                type="text"
-                                                value={invigilator}
-                                                onChange={(e) => setInvigilator(e.target.value)}
-                                                className="w-full border border-disabled rounded-lg px-3 py-2 bg-white text-heading focus:outline-none focus:border-indigo-600"
-                                                placeholder="Examiner name"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="flex justify-end pt-1">
-                                        <button
-                                            type="submit"
-                                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
+                                    return (
+                                        <tr
+                                            key={lead.id}
+                                            onClick={() => handleOpenStudentModal(lead)}
+                                            className={`hover:bg-blue-50/40 transition-colors cursor-pointer group ${
+                                                isChecked ? 'bg-blue-50/60' : ''
+                                            }`}
                                         >
-                                            <span>{activeLead.stage === 'CBT_SCHEDULED' ? 'Confirm Reschedule' : 'Save & Confirm Schedule'}</span>
-                                            <ArrowRightIcon className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            {/* Action Block 2: Attendance & Conduct Management */}
-                            <div className="bg-white border border-disabled rounded-2xl p-5 space-y-4 shadow-xs">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-6 h-6 rounded-md bg-amber-600 text-white flex items-center justify-center font-bold text-xs">
-                                        2
-                                    </div>
-                                    <h3 className="text-sm font-bold text-heading">
-                                        Manage Candidate Attendance & Conduct
-                                    </h3>
-                                </div>
-
-                                <form onSubmit={handleSaveAttendance} className="space-y-4 text-xs">
-                                    <div>
-                                        <label className="block text-heading font-bold mb-2">
-                                            Select Attendance Status *
-                                        </label>
-                                        <div className="grid grid-cols-3 gap-3">
-                                            {[
-                                                { id: 'Present', label: 'Present / Appeared', desc: 'Candidate arrived & seated' },
-                                                { id: 'Absent', label: 'Absent / No-Show', desc: 'Did not attend test' },
-                                                { id: 'Rescheduled', label: 'Request Reschedule', desc: 'Parent requested new slot' },
-                                            ].map((status) => (
-                                                <button
-                                                    type="button"
-                                                    key={status.id}
-                                                    onClick={() => setAttendanceStatus(status.id)}
-                                                    className={`p-3 rounded-xl border text-left font-semibold transition-all cursor-pointer ${
-                                                        attendanceStatus === status.id
-                                                            ? status.id === 'Present'
-                                                                ? 'bg-green-50 text-green border-green shadow-xs'
-                                                                : status.id === 'Absent'
-                                                                ? 'bg-red-50 text-alert border-alert shadow-xs'
-                                                                : 'bg-amber-50 text-amber-800 border-amber-600 shadow-xs'
-                                                            : 'bg-white border-disabled text-heading hover:bg-disabled/20'
+                                            {/* Checkbox */}
+                                            {/* The cell owns the click (bigger hit area). The input's own onChange
+                                                is a no-op so one click never toggles twice (cell + input). */}
+                                            <td
+                                                className="py-3.5 px-4 text-center"
+                                                onClick={(e) => handleToggleBatchCandidate(lead, e)}
+                                                title={isOtherClass ? `Only Grade ${selectionGrade} students can be added to this batch` : undefined}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isChecked}
+                                                    onChange={() => {}}
+                                                    aria-disabled={isOtherClass}
+                                                    className={`w-4 h-4 rounded accent-blue-600 ${
+                                                        isOtherClass ? 'opacity-30 cursor-not-allowed' : 'cursor-pointer'
                                                     }`}
+                                                />
+                                            </td>
+
+                                            {/* Student & ID (Dual Palette Initial Avatars) */}
+                                            <td className="py-3.5 px-3">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className={`w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center shrink-0 ${getAvatarClasses(lead, idx)}`}>
+                                                        {lead.student?.charAt(0) || 'S'}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-bold text-heading block group-hover:text-blue-700 transition-colors">
+                                                            {lead.student}
+                                                        </span>
+                                                        <span className="text-[10px] text-gray font-mono">
+                                                            {lead.id}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </td>
+
+                                            {/* Parent & Phone */}
+                                            <td className="py-3.5 px-3">
+                                                <div className="text-xs text-heading font-medium">
+                                                    {lead.parent}
+                                                </div>
+                                                <div className="text-[11px] text-gray flex items-center gap-1 mt-0.5">
+                                                    <PhoneIcon className="w-3 h-3 text-gray" />
+                                                    <span>{lead.phone}</span>
+                                                </div>
+                                            </td>
+
+                                            {/* Target Grade (Color-Coded by Level) */}
+                                            <td className="py-3.5 px-3">
+                                                <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full border ${getGradeBadgeStyle(lead.grade)}`}>
+                                                    Grade {lead.grade}
+                                                </span>
+                                                <div className="text-[10px] text-gray mt-0.5">
+                                                    Tests Gr {Number(lead.grade) > 5 ? Number(lead.grade) - 1 : 5} Syllabus
+                                                </div>
+                                            </td>
+
+                                            {/* Status & Schedule */}
+                                            <td className="py-3.5 px-3">
+                                                <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full border ${getStageBadgeClasses(lead.stage)}`}>
+                                                    {STAGE_LABELS[lead.stage] || lead.stage}
+                                                </span>
+                                                <div className="text-[10px] text-gray mt-0.5">
+                                                    {lead.due ? formatDateTime(lead.due) : 'Not scheduled'}
+                                                </div>
+                                            </td>
+
+                                            {/* Test Paper & Syllabus */}
+                                            <td className="py-3.5 px-3">
+                                                {lead.testPaper ? (
+                                                    <div className="flex items-center gap-1.5 text-xs text-green font-bold">
+                                                        <CheckIcon className="w-3.5 h-3.5 text-green" />
+                                                        <span>Paper Ready ({lead.testPaper.totalQuestions} Qs)</span>
+                                                    </div>
+                                                ) : lead.testConfig ? (
+                                                    <span className="text-[11px] font-bold text-blue-700">
+                                                        Portion Set ({lead.testConfig.summaryLabel})
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[11px] text-gray">
+                                                        Standard Syllabus
+                                                    </span>
+                                                )}
+                                                <div className="text-[10px] text-gray mt-0.5 truncate max-w-xs">
+                                                    {lead.lastOutcome || lead.nextAction}
+                                                </div>
+                                            </td>
+
+                                            {/* Actions (Orange for Ready, Blue for Scheduled, Green for Completed) */}
+                                            <td className="py-3.5 px-4 text-right">
+                                                <div
+                                                    className="inline-flex items-center gap-2"
+                                                    onClick={(e) => e.stopPropagation()}
                                                 >
-                                                    <div className="font-bold">{status.label}</div>
-                                                    <div className="text-[10px] text-gray mt-0.5">{status.desc}</div>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    {/* Completion Checkbox if Present */}
-                                    {attendanceStatus === 'Present' && (
-                                        <div className="p-3 bg-green-50/60 border border-green/20 rounded-xl flex items-center gap-2.5">
-                                            <input
-                                                type="checkbox"
-                                                id="markComplete"
-                                                checked={markCompleteOnPresent}
-                                                onChange={(e) => setMarkCompleteOnPresent(e.target.checked)}
-                                                className="w-4 h-4 accent-green rounded cursor-pointer"
-                                            />
-                                            <label htmlFor="markComplete" className="text-xs text-heading font-semibold cursor-pointer">
-                                                Test completed successfully: Move candidate to <strong>CBT_COMPLETED</strong> stage for scoring & rank evaluation.
-                                            </label>
-                                        </div>
-                                    )}
-
-                                    {/* Conduct Remarks */}
-                                    <div>
-                                        <label className="block text-heading font-bold mb-1">
-                                            Conduct Remarks & Invigilator Notes
-                                        </label>
-                                        <textarea
-                                            rows="2"
-                                            value={conductNote}
-                                            onChange={(e) => setConductNote(e.target.value)}
-                                            placeholder="e.g. Seated at Terminal #12. Submitted all sections. No technical glitches."
-                                            className="w-full border border-disabled rounded-lg p-2.5 text-heading focus:outline-none focus:border-indigo-600 placeholder-gray"
-                                        />
-                                    </div>
-
-                                    <div className="flex justify-end">
-                                        <button
-                                            type="submit"
-                                            className="px-5 py-2.5 bg-heading hover:bg-black text-white font-bold rounded-lg transition-colors shadow-sm cursor-pointer"
-                                        >
-                                            Save Attendance Record
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-
-                            {/* Section 3: Chronological History for Active Candidate */}
-                            <div className="pt-2 border-t border-disabled/40">
-                                <h4 className="text-xs font-bold text-heading uppercase tracking-wider mb-3">
-                                    Candidate Timeline & Audit History
-                                </h4>
-                                <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                                    {activeLead.history && activeLead.history.length > 0 ? (
-                                        [...activeLead.history].reverse().map((item, idx) => (
-                                            <div key={item.id || idx} className="text-xs p-2.5 bg-disabled/15 rounded-lg border border-disabled/30">
-                                                <div className="flex items-center justify-between text-[11px] text-gray">
-                                                    <span className="font-bold text-heading">{item.actor}</span>
-                                                    <span>{formatDateTime(item.at)}</span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenStudentModal(lead)}
+                                                        className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs ${
+                                                            isReady
+                                                                ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                                                                : isScheduled
+                                                                ? 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
+                                                                : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                                                        }`}
+                                                    >
+                                                        {isReady ? 'Manage' : isScheduled ? 'Details' : 'Scorecard'}
+                                                    </button>
+                                                    <WhatsAppContactButton
+                                                        phoneNumber={lead.phone}
+                                                        studentName={lead.student}
+                                                        parentName={lead.parent}
+                                                        customMessage={customWaMsg}
+                                                    />
                                                 </div>
-                                                <div className="text-heading font-medium mt-1 leading-relaxed">
-                                                    {item.text}
-                                                </div>
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-xs text-gray py-2">No history logged yet.</div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                                            </td>
+                                        </tr>
+                                    );
+                                })
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+
+                {/* Table Footer */}
+                <div className="p-3 bg-[#F8FAFC] border-t border-disabled/60 flex items-center justify-between text-xs text-gray">
+                    <div>
+                        Showing <strong className="text-heading">{currentQueue.length}</strong> of{' '}
+                        <strong className="text-heading">{leads.length}</strong> total candidates
+                    </div>
+                    <div className="text-[11px]">
+                        Tip: Click anywhere on a candidate row to open their complete CBT management modal.
+                    </div>
                 </div>
             </div>
+
+            {/* MODAL 1: Single Student Complete Details Popup */}
+            <SingleStudentCBTModal
+                isOpen={Boolean(singleStudentModalLead)}
+                onClose={() => setSingleStudentModalLead(null)}
+                lead={activeSingleLead}
+                onSaveCBTAction={onSaveCBTAction}
+                onOpenSyllabusModal={(lead) => handleOpenSyllabusModalForLead(lead)}
+                onOpenTestModal={(lead) => handleOpenTestModalForLead(lead)}
+            />
+
+            {/* MODAL 2: CBT Syllabus Portion Selector Modal */}
+            <CBTSyllabusModal
+                isOpen={isSyllabusModalOpen}
+                onClose={() => setIsSyllabusModalOpen(false)}
+                targetGrade={modalTargetGrade}
+                candidates={modalCandidates}
+                onSavePortion={handleSavePortion}
+            />
+
+            {/* MODAL 3: CBT Test Paper Preview & Link Modal */}
+            <CBTTestModal
+                isOpen={isTestModalOpen}
+                onClose={() => setIsTestModalOpen(false)}
+                testPaper={activeTestPaper}
+                candidate={testModalCandidate}
+                onAttachToCandidate={handleAttachTestPaper}
+            />
         </div>
     );
 }

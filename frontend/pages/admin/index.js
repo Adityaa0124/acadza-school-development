@@ -160,6 +160,7 @@ export default function AdminPage() {
         setView('leads');
         // Synchronize with database
         await createLead({
+            leadId: newLead.id,
             student: newLead.student,
             parent: newLead.parent,
             phone: newLead.phone,
@@ -267,6 +268,9 @@ export default function AdminPage() {
                     stage: cbtPayload.nextStage || lead.stage,
                     nextAction: cbtPayload.nextAction || lead.nextAction,
                     due: cbtPayload.due !== undefined ? cbtPayload.due : lead.due,
+                    testConfig: cbtPayload.testConfig !== undefined ? cbtPayload.testConfig : lead.testConfig,
+                    testPaper: cbtPayload.testPaper !== undefined ? cbtPayload.testPaper : lead.testPaper,
+                    testResult: cbtPayload.testResult !== undefined ? cbtPayload.testResult : lead.testResult,
                     lastOutcome: cbtPayload.outcome,
                     history: [...(lead.history || []), newHistoryItem],
                 };
@@ -280,6 +284,10 @@ export default function AdminPage() {
             due: cbtPayload.due,
             nextStage: cbtPayload.nextStage,
             nextAction: cbtPayload.nextAction,
+            testConfig: cbtPayload.testConfig,
+            testPaper: cbtPayload.testPaper,
+            testResult: cbtPayload.testResult,
+            actor: user?.name || 'CBT Conductivity Team',
         });
     };
 

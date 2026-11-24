@@ -34,8 +34,14 @@ export default function AddEnquiry({
         if (!student.trim() || !parent.trim() || !phone.trim()) return;
 
         const cleanPhone = phone.replace(/\D/g, '');
+        // Next ID = highest existing number + 1. Using the list length collides
+        // with existing IDs once the sequence has gaps, which made two rows share one ID.
+        const maxSeq = existingLeads.reduce((max, l) => {
+            const m = /^AC-2027-(\d+)$/.exec(l.id || '');
+            return m ? Math.max(max, parseInt(m[1], 10)) : max;
+        }, 0);
         const newLead = {
-            id: `AC-2027-${String(existingLeads.length + 1).padStart(3, '0')}`,
+            id: `AC-2027-${String(maxSeq + 1).padStart(3, '0')}`,
             school: SCHOOL_NAME,
             student: student.trim(),
             parent: parent.trim(),

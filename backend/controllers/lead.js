@@ -134,8 +134,17 @@ exports.create_lead = async (req, res) => {
     }
 
     const cleanPhone = String(phone).replace(/\D/g, "");
-    const count = await Lead.countDocuments();
-    const leadId = req.body.leadId || `AC-2027-${String(count + 1).padStart(3, "0")}`;
+    // Derive the next ID from the highest existing number, not the document count.
+    // Counting collides with existing IDs once the sequence has gaps (e.g. 001-003, 006-009, 015...).
+    let leadId = req.body.leadId;
+    if (!leadId || (await Lead.exists({ leadId }))) {
+      const existingIds = await Lead.find({ leadId: /^AC-2027-\d+$/ }).select("leadId").lean();
+      const maxSeq = existingIds.reduce(
+        (max, d) => Math.max(max, parseInt(d.leadId.split("-")[2], 10) || 0),
+        0
+      );
+      leadId = `AC-2027-${String(maxSeq + 1).padStart(3, "0")}`;
+    }
 
     const initialStage = routeToTest ? "READY_FOR_CBT" : "ENQUIRY";
     const nextAction = routeToTest
@@ -148,9 +157,8 @@ exports.create_lead = async (req, res) => {
         at: new Date(),
         text: note
           ? `Enquiry registered: ${note.trim()}`
-          : `Enquiry registered via ${source || "Walk-in"}. ${
-              routeToTest ? "Routed directly to CBT Evaluation." : "Queued for counseling call."
-            }`,
+          : `Enquiry registered via ${source || "Walk-in"}. ${routeToTest ? "Routed directly to CBT Evaluation." : "Queued for counseling call."
+          }`,
       },
     ];
 
@@ -194,7 +202,7 @@ exports.create_lead = async (req, res) => {
  */
 exports.record_outcome = async (req, res) => {
   try {
-    const { id, outcome, note, due, nextStage, nextAction } = req.body;
+    const { id, outcome, note, due, nextStage, nextAction, testConfig, testPaper, testResult, actor } = req.body;
 
     if (!id || !outcome) {
       return res.status(400).json({
@@ -213,11 +221,14 @@ exports.record_outcome = async (req, res) => {
 
     if (nextStage) lead.stage = nextStage;
     if (nextAction) lead.nextAction = nextAction;
+    if (testConfig !== undefined) lead.testConfig = testConfig;
+    if (testPaper !== undefined) lead.testPaper = testPaper;
+    if (testResult !== undefined) lead.testResult = testResult;
     lead.due = due ? new Date(due) : null;
     lead.lastOutcome = outcome + (note ? ` - ${note.trim()}` : "");
 
     lead.history.push({
-      actor: req.user?.name || "Admissions Counselor",
+      actor: actor || req.user?.name || "Admissions Counselor",
       at: new Date(),
       text: note ? `Outcome: ${outcome}. Note: ${note.trim()}` : `Outcome: ${outcome}`,
     });
@@ -335,50 +346,140 @@ exports.seed_leads = async (req, res) => {
 
     const seedData = [
       {
-        leadId: "AC-2027-001",
+        leadId: "AC-2027-008",
         school: "Acadza Greenfield School",
-        student: "Aarav Mehta",
-        parent: "Sanjay Mehta",
-        phone: "9820112233",
-        alternate: "9820112234",
-        grade: "11",
-        source: "Walk-in",
+        student: "Vihaan Reddy",
+        parent: "Venkat Reddy",
+        phone: "9844556677",
+        alternate: "9844556678",
+        grade: "8",
+        source: "Referral",
         cycle: "2027/28",
-        stage: "ENQUIRY",
-        caller: "usr-1",
-        nextAction: "Arrange welcome call",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
         due: new Date(),
-        lastOutcome: "Parent visited front desk; inquired for 2-year JEE coaching + schooling.",
-        history: [
-          {
-            actor: "Front desk clerk",
-            at: new Date(),
-            text: "Enquiry recorded at school counter. Parent requested information pack.",
-          },
-        ],
+        lastOutcome: "Referred by existing parent. Applying for Grade 8 admission.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Candidate queued for Grade 8 CBT." }],
       },
       {
-        leadId: "AC-2027-002",
+        leadId: "AC-2027-015",
         school: "Acadza Greenfield School",
-        student: "Diya Sharma",
-        parent: "Ramesh Sharma",
-        phone: "9871122334",
+        student: "Tanvi Deshpande",
+        parent: "Sudhir Deshpande",
+        phone: "9844778811",
         alternate: "",
-        grade: "12",
-        source: "Phone",
+        grade: "8",
+        source: "Website",
         cycle: "2027/28",
-        stage: "INTERESTED",
-        caller: "usr-1",
-        nextAction: "Discuss syllabus & batches",
-        due: new Date(Date.now() + 86400000),
-        lastOutcome: "Parent interested in Physics and Maths revision batch.",
-        history: [
-          {
-            actor: "Front desk clerk",
-            at: new Date(),
-            text: "Phone enquiry taken. Student currently studying in Class 12.",
-          },
-        ],
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Online application submitted for Grade 8. Ready for CBT.",
+        history: [{ actor: "Web Admissions Portal", at: new Date(), text: "Registered online for Grade 8 entrance test." }],
+      },
+      {
+        leadId: "AC-2027-016",
+        school: "Acadza Greenfield School",
+        student: "Atharva Bhat",
+        parent: "Narayanan Bhat",
+        phone: "9844778899",
+        alternate: "",
+        grade: "8",
+        source: "Website",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Candidate for Grade 8. Ready for entrance evaluation.",
+        history: [{ actor: "Web Admissions Portal", at: new Date(), text: "Registered online for Grade 8 entrance test." }],
+      },
+      {
+        leadId: "AC-2027-022",
+        school: "Acadza Greenfield School",
+        student: "Advait Joshi",
+        parent: "Makarand Joshi",
+        phone: "9844889900",
+        alternate: "",
+        grade: "8",
+        source: "Walk-in",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Walk-in enquiry for Class 8 middle school admission.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Candidate queued for Grade 8 CBT." }],
+      },
+      {
+        leadId: "AC-2027-023",
+        school: "Acadza Greenfield School",
+        student: "Anika Kulkarni",
+        parent: "Prasad Kulkarni",
+        phone: "9844991122",
+        alternate: "",
+        grade: "8",
+        source: "Referral",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Sibling studying in school. Applying for Class 8 admission.",
+        history: [{ actor: "Admissions Officer", at: new Date(), text: "Queued for Grade 8 CBT test." }],
+      },
+      {
+        leadId: "AC-2027-006",
+        school: "Acadza Greenfield School",
+        student: "Reyansh Verma",
+        parent: "Sunil Verma",
+        phone: "9820223344",
+        alternate: "9820223345",
+        grade: "6",
+        source: "Walk-in",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Enquired for Grade 6 middle school admission. Ready for CBT evaluation.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Candidate queued for CBT." }],
+      },
+      {
+        leadId: "AC-2027-007",
+        school: "Acadza Greenfield School",
+        student: "Aanya Patel",
+        parent: "Kiran Patel",
+        phone: "9833445566",
+        alternate: "9833445567",
+        grade: "7",
+        source: "Website",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Direct online application for Grade 7. Ready for CBT.",
+        history: [{ actor: "Web admissions portal", at: new Date(), text: "Online registration confirmed." }],
+      },
+      {
+        leadId: "AC-2027-009",
+        school: "Acadza Greenfield School",
+        student: "Ishaan Gupta",
+        parent: "Rajesh Gupta",
+        phone: "9855667788",
+        alternate: "9855667789",
+        grade: "9",
+        source: "Walk-in",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Secondary school intake for Grade 9. Ready for Grade 8 syllabus evaluation.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Walk-in intake for Class 9." }],
       },
       {
         leadId: "AC-2027-003",
@@ -393,15 +494,43 @@ exports.seed_leads = async (req, res) => {
         stage: "READY_FOR_CBT",
         caller: null,
         nextAction: "Schedule entrance test (CBT)",
-        due: null,
-        lastOutcome: "Passed clerk intake; opted straight for entrance evaluation.",
-        history: [
-          {
-            actor: "Front desk clerk",
-            at: new Date(),
-            text: "New enquiry taken. Mother requested direct entrance test slot.",
-          },
-        ],
+        due: new Date(),
+        lastOutcome: "Opted straight for Grade 10 board prep evaluation.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Direct entrance test slot." }],
+      },
+      {
+        leadId: "AC-2027-001",
+        school: "Acadza Greenfield School",
+        student: "Aarav Mehta",
+        parent: "Sanjay Mehta",
+        phone: "9820112233",
+        alternate: "9820112234",
+        grade: "11",
+        source: "Walk-in",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Inquired for 2-year JEE coaching + schooling. Routed to CBT.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Routed to CBT evaluation." }],
+      },
+      {
+        leadId: "AC-2027-002",
+        school: "Acadza Greenfield School",
+        student: "Diya Sharma",
+        parent: "Ramesh Sharma",
+        phone: "9871122334",
+        alternate: "",
+        grade: "12",
+        source: "Phone",
+        cycle: "2027/28",
+        stage: "READY_FOR_CBT",
+        caller: null,
+        nextAction: "Schedule entrance test (CBT)",
+        due: new Date(),
+        lastOutcome: "Interested in Physics and Maths revision batch. Ready for CBT diagnostic.",
+        history: [{ actor: "Front desk clerk", at: new Date(), text: "Routed to entrance diagnostic test." }],
       },
     ];
 
@@ -409,6 +538,85 @@ exports.seed_leads = async (req, res) => {
     return res.json({ isSuccessful: true, message: "Database seeded successfully" });
   } catch (err) {
     return res.status(500).json({ isSuccessful: false, message: err.message });
+  }
+};
+
+/**
+ * GET /admin/leads/cbt/test-paper/:studentId
+ * Public endpoint: Candidate retrieves their allocated entrance test paper.
+ */
+exports.get_cbt_test_paper = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    let lead = null;
+    if (studentId && studentId !== "GUEST") {
+      lead = await Lead.findOne({
+        $or: [{ leadId: studentId }, { _id: studentId.match(/^[0-9a-fA-F]{24}$/) ? studentId : null }],
+      });
+    }
+
+    if (lead && lead.testPaper) {
+      return res.json({
+        isSuccessful: true,
+        testPaper: lead.testPaper,
+        candidate: { student: lead.student, parent: lead.parent, grade: lead.grade, id: lead.leadId },
+      });
+    }
+
+    return res.json({
+      isSuccessful: true,
+      testPaper: null,
+      candidate: lead ? { student: lead.student, parent: lead.parent, grade: lead.grade, id: lead.leadId } : null,
+    });
+  } catch (err) {
+    return res.status(500).json({ isSuccessful: false, error: err.message });
+  }
+};
+
+/**
+ * POST /admin/leads/cbt/submit-test
+ * Public endpoint: Candidate submits their completed CBT test.
+ * Scores, grading, and result summary are persisted to MongoDB Atlas.
+ */
+exports.submit_cbt_test = async (req, res) => {
+  try {
+    const { studentId, testId, clientResult } = req.body;
+    let lead = null;
+    if (studentId && studentId !== "GUEST") {
+      lead = await Lead.findOne({
+        $or: [{ leadId: studentId }, { _id: studentId.match(/^[0-9a-fA-F]{24}$/) ? studentId : null }],
+      });
+    }
+
+    if (!lead) {
+      return res.json({ isSuccessful: true, message: "Guest test recorded", result: clientResult });
+    }
+
+    const totalScore = clientResult?.score || 0;
+    const totalMarks = clientResult?.totalMarks || 30;
+    const percentage = clientResult?.percentage || 0;
+
+    lead.stage = "CBT_COMPLETED";
+    lead.lastOutcome = `CBT Test Submitted. Score: ${totalScore}/${totalMarks} (${percentage}%)`;
+    lead.nextAction = "Review Entrance CBT Score & Issue Merit Rank";
+    lead.testResult = clientResult;
+
+    lead.history.push({
+      actor: "Student CBT Portal",
+      at: new Date(),
+      text: `CBT Entrance Assessment submitted by candidate. Score: ${totalScore}/${totalMarks} (${percentage}%). Status updated to CBT_COMPLETED.`,
+    });
+
+    await lead.save();
+
+    return res.json({
+      isSuccessful: true,
+      message: "CBT Result recorded successfully in Atlas",
+      lead: formatLead(lead),
+    });
+  } catch (err) {
+    console.error("Error submitting CBT test:", err);
+    return res.status(500).json({ isSuccessful: false, error: err.message });
   }
 };
 

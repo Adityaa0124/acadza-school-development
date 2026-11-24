@@ -52,6 +52,9 @@ const LeadSchema = new Schema(
     nextAction: { type: String, default: "Arrange welcome call" },
     due: { type: Date, default: null, index: true },
     lastOutcome: { type: String, default: "" },
+    testConfig: { type: Schema.Types.Mixed, default: null },
+    testPaper: { type: Schema.Types.Mixed, default: null },
+    testResult: { type: Schema.Types.Mixed, default: null },
     history: [HistorySchema],
   },
   {
