@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowRightIcon, UserIcon, ClockIcon } from './icons';
+import { ArrowRightIcon, UserIcon, ClockIcon, CheckIcon } from './icons';
 
 /**
  * Hub navigation matrix rendered upon admin authentication.
@@ -20,7 +20,7 @@ export default function PortalHub({ onSelectModule, metrics }) {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Module 1: Admin Dashboard (Fully Colored Blue Card) */}
                 <div
                     onClick={() => onSelectModule('users')}
@@ -98,6 +98,46 @@ export default function PortalHub({ onSelectModule, metrics }) {
                         </div>
                         <div className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3.5 py-1.5 rounded-lg border border-white/30 transition-all group-hover:translate-x-1">
                             <span>Open Lead Desk</span>
+                            <ArrowRightIcon className="w-4 h-4" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Module 3: Attendance (Fully Colored Emerald Card) */}
+                <div
+                    onClick={() => onSelectModule('attendance')}
+                    className="group relative bg-gradient-to-br from-[#10B981] via-[#059669] to-[#065F46] rounded-2xl p-7 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 hover:-translate-y-1 transition-all duration-200 cursor-pointer overflow-hidden flex flex-col justify-between min-h-[250px]"
+                >
+                    <div className="absolute -top-12 -right-12 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+
+                    <div>
+                        <div className="flex items-center justify-between mb-5">
+                            <div className="w-12 h-12 rounded-xl bg-white/20 text-white backdrop-blur-xs flex items-center justify-center font-bold border border-white/30 shadow-inner">
+                                <CheckIcon className="w-6 h-6" />
+                            </div>
+                            <span className="px-3 py-1 text-xs font-bold rounded-full bg-white/20 text-white backdrop-blur-xs border border-white/30 tracking-wide uppercase">
+                                Daily Register
+                            </span>
+                        </div>
+                        <h2 className="text-2xl font-black text-white tracking-tight">
+                            Attendance
+                        </h2>
+                        <p className="text-sm text-emerald-100/90 mt-2 leading-relaxed">
+                            Mark daily student attendance as present, late or absent, and review each day&apos;s register.
+                        </p>
+                    </div>
+
+                    <div className="mt-8 pt-4 border-t border-white/20 flex items-center justify-between">
+                        <div className="flex items-center gap-4 text-xs text-emerald-100">
+                            <div>
+                                <span className="font-bold text-white text-sm">{metrics?.activeStudents || 0}</span> Students
+                            </div>
+                            <div>
+                                <span className="font-bold text-white text-sm">{metrics?.presentToday || 0}</span> Present Today
+                            </div>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 text-xs font-bold bg-white/20 hover:bg-white/30 px-3.5 py-1.5 rounded-lg border border-white/30 transition-all group-hover:translate-x-1">
+                            <span>Open Attendance</span>
                             <ArrowRightIcon className="w-4 h-4" />
                         </div>
                     </div>

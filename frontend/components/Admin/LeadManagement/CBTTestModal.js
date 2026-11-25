@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { CopyIcon, CheckIcon, TestDocIcon, WhatsAppIcon } from '../icons';
 import { buildTestShareUrl } from './testGenerator';
+import { downloadTestPdf } from './testPdf';
 
 /**
  * CBTTestModal: Admin Preview & Shareable Link Generator.
@@ -20,8 +21,14 @@ export default function CBTTestModal({
 }) {
     const [copied, setCopied] = useState(false);
     const [previewQuestionsOpen, setPreviewQuestionsOpen] = useState(false);
+    const [pdfBlocked, setPdfBlocked] = useState(false);
 
     if (!isOpen || !testPaper) return null;
+
+    const handleDownloadPdf = (variant) => {
+        const ok = downloadTestPdf(testPaper, { variant, candidate });
+        setPdfBlocked(!ok);
+    };
 
     const shareUrl = buildTestShareUrl(testPaper.testId, candidate?.id || candidate?.leadId || '');
 
@@ -170,6 +177,44 @@ export default function CBTTestModal({
                         <p className="text-[11px] text-gray">
                             Send this link to the student or parent. They can open it in any browser to take the entrance test.
                         </p>
+                    </div>
+
+                    {/* 3b. Offline Test PDF */}
+                    <div className="bg-white border-2 border-blue-200 rounded-xl p-5 shadow-xs space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-heading uppercase tracking-wider flex items-center gap-1.5">
+                                <TestDocIcon className="w-4 h-4 text-blue-700" />
+                                <span>Offline Test (PDF)</span>
+                            </span>
+                            <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
+                                For pen &amp; paper tests
+                            </span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadPdf('paper')}
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                            >
+                                <span>Download Question Paper (PDF)</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDownloadPdf('key')}
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 bg-white border border-blue-200 hover:bg-blue-50 text-blue-700 rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                            >
+                                <span>Download Answer Key (PDF)</span>
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-gray">
+                            Opens the print dialog &mdash; choose <strong>Save as PDF</strong> as the destination. The question
+                            paper has no answers, so it can be printed and handed to students; keep the answer key for evaluation.
+                        </p>
+                        {pdfBlocked && (
+                            <p className="text-[11px] font-semibold text-red-600">
+                                Your browser blocked the PDF window. Allow pop-ups for this site and try again.
+                            </p>
+                        )}
                     </div>
 
                     {/* 4. Question Preview Accordion */}

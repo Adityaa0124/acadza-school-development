@@ -15,6 +15,7 @@ import CallingDesk from '@components/Admin/LeadManagement/CallingDesk';
 import AddEnquiry from '@components/Admin/LeadManagement/AddEnquiry';
 import LeadDetail from '@components/Admin/LeadManagement/LeadDetail';
 import CBTConductDesk from '@components/Admin/LeadManagement/CBTConductDesk';
+import AttendanceDesk from '@components/Admin/AttendanceDesk';
 
 // Domain constants and seed fixtures
 import { INITIAL_ADMISSIONS_LEADS, INITIAL_USERS } from '@components/Admin/constants';
@@ -46,6 +47,12 @@ export default function AdminPage() {
 
     // User management state
     const [users, setUsers] = useState(INITIAL_USERS);
+
+    // Attendance register: { [YYYY-MM-DD]: { [userId]: 'present' | 'late' | 'absent' } }
+    const [attendance, setAttendance] = useState({});
+    const handleSaveAttendance = (date, marks) => {
+        setAttendance((prev) => ({ ...prev, [date]: { ...(prev[date] || {}), ...marks } }));
+    };
 
     // Authentication form state for unauthenticated admins
     const [loginEmail, setLoginEmail] = useState('');
@@ -79,8 +86,10 @@ export default function AdminPage() {
         const dueCalls = leads.filter(
             (l) => ['ENQUIRY', 'INTERESTED'].includes(l.stage) && l.due && l.due <= now
         ).length;
-        return { totalUsers, activeStudents, totalLeads, dueCalls };
-    }, [users, leads]);
+        const today = new Date().toISOString().slice(0, 10);
+        const presentToday = Object.values(attendance[today] || {}).filter((s) => s === 'present' || s === 'late').length;
+        return { totalUsers, activeStudents, totalLeads, dueCalls, presentToday };
+    }, [users, leads, attendance]);
 
     // Handler: User authentication via standard credentials
     const handleLoginSubmit = async (e) => {
@@ -414,6 +423,8 @@ export default function AdminPage() {
                                         ? 'Calling Desk'
                                         : view === 'cbt'
                                         ? 'CBT Conduct Desk'
+                                        : view === 'attendance'
+                                        ? 'Attendance'
                                         : view === 'add_enquiry'
                                         ? 'New Enquiry'
                                         : 'Lead Dossier'}
@@ -457,7 +468,18 @@ export default function AdminPage() {
                         onSelectModule={(mod) => {
                             if (mod === 'users') setView('users');
                             if (mod === 'leads') setView('leads');
+                            if (mod === 'attendance') setView('attendance');
                         }}
+                    />
+                )}
+
+                {/* View: Attendance Register */}
+                {view === 'attendance' && (
+                    <AttendanceDesk
+                        users={users}
+                        attendance={attendance}
+                        onSaveAttendance={handleSaveAttendance}
+                        onBackToHub={() => setView('hub')}
                     />
                 )}
 
