@@ -123,14 +123,14 @@ export default function PortalHub({ onSelectModule, metrics }) {
                             Attendance
                         </h2>
                         <p className="text-sm text-emerald-100/90 mt-2 leading-relaxed">
-                            Mark daily student attendance as present, late or absent, and review each day&apos;s register.
+                            Mark daily attendance for faculty, teachers and school employees as present, late or absent, and review each day&apos;s register.
                         </p>
                     </div>
 
                     <div className="mt-8 pt-4 border-t border-white/20 flex items-center justify-between">
                         <div className="flex items-center gap-4 text-xs text-emerald-100">
                             <div>
-                                <span className="font-bold text-white text-sm">{metrics?.activeStudents || 0}</span> Students
+                                <span className="font-bold text-white text-sm">{metrics?.staffCount || 0}</span> Faculty &amp; Staff
                             </div>
                             <div>
                                 <span className="font-bold text-white text-sm">{metrics?.presentToday || 0}</span> Present Today

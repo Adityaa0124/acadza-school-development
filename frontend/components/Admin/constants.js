@@ -336,6 +336,9 @@ export const INITIAL_USERS = [
         planType: 'silver',
         phoneVerified: true,
     },
+    { _id: 'demo-t1', name: 'Neha Verma', username: 'Acadza-Faculty-1', email: 'neha.verma@example.com', phone: '9000000001', role: 'teacher', phoneVerified: true },
+    { _id: 'demo-t2', name: 'Rahul Mehta', username: 'Acadza-Faculty-2', email: 'rahul.mehta@example.com', phone: '9000000002', role: 'teacher', phoneVerified: true },
+    { _id: 'demo-s1', name: 'Sunita Rao', username: 'Acadza-Staff-1', email: 'sunita.rao@example.com', phone: '9000000003', role: 'staff', phoneVerified: true },
 ];
 
 export function formatDateTime(isoString) {

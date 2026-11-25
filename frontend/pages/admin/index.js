@@ -86,9 +86,10 @@ export default function AdminPage() {
         const dueCalls = leads.filter(
             (l) => ['ENQUIRY', 'INTERESTED'].includes(l.stage) && l.due && l.due <= now
         ).length;
+        const staffCount = users.filter((u) => ['teacher', 'staff', 'admin', 'superadmin'].includes(u.role) && !u.isBlocked).length;
         const today = new Date().toISOString().slice(0, 10);
         const presentToday = Object.values(attendance[today] || {}).filter((s) => s === 'present' || s === 'late').length;
-        return { totalUsers, activeStudents, totalLeads, dueCalls, presentToday };
+        return { totalUsers, activeStudents, totalLeads, dueCalls, presentToday, staffCount };
     }, [users, leads, attendance]);
 
     // Handler: User authentication via standard credentials

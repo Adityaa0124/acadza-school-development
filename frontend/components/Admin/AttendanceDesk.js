@@ -7,31 +7,33 @@ const STATUSES = [
     { key: 'absent', label: 'Absent', on: 'bg-red-600 text-white border-red-600', off: 'text-red-700 border-red-200 hover:bg-red-50' },
 ];
 
+const ROLE_LABELS = { teacher: 'Faculty', staff: 'Staff', admin: 'Admin', superadmin: 'Super Admin' };
+const STAFF_ROLES = Object.keys(ROLE_LABELS);
+
 const todayStr = () => new Date().toISOString().slice(0, 10);
 
 /**
- * Daily attendance register.
- * Pick a date and (optionally) a course, mark each student Present / Late / Absent, and save.
+ * Daily attendance register for school employees and faculty (teacher / staff / admin roles).
+ * Pick a date and (optionally) a role, mark each person Present / Late / Absent, and save.
  * Records are kept per date in `attendance` ({ [date]: { [userId]: status } }), owned by the page.
  */
 export default function AttendanceDesk({ users, attendance, onSaveAttendance, onBackToHub }) {
-    const students = useMemo(() => users.filter((u) => u.role === 'student' && !u.isBlocked), [users]);
-    const courses = useMemo(() => [...new Set(students.map((s) => s.course).filter(Boolean))], [students]);
+    const employees = useMemo(() => users.filter((u) => STAFF_ROLES.includes(u.role) && !u.isBlocked), [users]);
 
     const [date, setDate] = useState(todayStr());
-    const [course, setCourse] = useState('');
+    const [roleFilter, setRoleFilter] = useState('');
     const [search, setSearch] = useState('');
     const [draft, setDraft] = useState({}); // unsaved edits for the selected date
     const [savedNotice, setSavedNotice] = useState(false);
 
     const visible = useMemo(() => {
         const q = search.trim().toLowerCase();
-        return students.filter(
+        return employees.filter(
             (s) =>
-                (!course || s.course === course) &&
+                (!roleFilter || s.role === roleFilter) &&
                 (!q || s.name?.toLowerCase().includes(q) || s.phone?.includes(q))
         );
-    }, [students, course, search]);
+    }, [employees, roleFilter, search]);
 
     const statusOf = (id) => draft[id] ?? attendance?.[date]?.[id] ?? '';
     const setStatus = (id, status) => {
@@ -81,7 +83,7 @@ export default function AttendanceDesk({ users, attendance, onSaveAttendance, on
                     </div>
                     <div>
                         <h1 className="text-xl font-black text-heading tracking-tight">Attendance</h1>
-                        <p className="text-xs text-gray mt-0.5">Mark daily attendance for students. Select a date, then save.</p>
+                        <p className="text-xs text-gray mt-0.5">Mark daily attendance for faculty and school employees. Select a date, then save.</p>
                     </div>
                 </div>
             </div>
@@ -117,20 +119,20 @@ export default function AttendanceDesk({ users, attendance, onSaveAttendance, on
                         className="text-xs bg-disabled/20 border border-disabled rounded-lg px-3 py-2 font-bold text-heading focus:outline-none focus:border-emerald-600"
                     />
                     <select
-                        value={course}
-                        onChange={(e) => setCourse(e.target.value)}
+                        value={roleFilter}
+                        onChange={(e) => setRoleFilter(e.target.value)}
                         className="text-xs bg-disabled/20 border border-disabled rounded-lg px-3 py-2 font-bold text-heading focus:outline-none focus:border-emerald-600"
                     >
-                        <option value="">All Courses</option>
-                        {courses.map((c) => (
-                            <option key={c} value={c}>
-                                {c}
+                        <option value="">All Faculty &amp; Staff</option>
+                        {STAFF_ROLES.map((role) => (
+                            <option key={role} value={role}>
+                                {ROLE_LABELS[role]}
                             </option>
                         ))}
                     </select>
                     <input
                         type="text"
-                        placeholder="Search student or phone..."
+                        placeholder="Search name or phone..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
                         className="w-56 px-3 py-2 text-xs bg-disabled/20 border border-disabled rounded-lg text-heading placeholder-gray focus:outline-none focus:border-emerald-600"
@@ -153,8 +155,8 @@ export default function AttendanceDesk({ users, attendance, onSaveAttendance, on
                         <thead>
                             <tr className="border-b border-disabled/70 bg-[#F8FAFC] text-gray uppercase text-[10px] tracking-wider font-bold">
                                 <th className="py-3 px-4 w-12">#</th>
-                                <th className="py-3 px-3">Student</th>
-                                <th className="py-3 px-3">Course</th>
+                                <th className="py-3 px-3">Name</th>
+                                <th className="py-3 px-3">Role</th>
                                 <th className="py-3 px-4 text-right">Attendance</th>
                             </tr>
                         </thead>
@@ -163,7 +165,7 @@ export default function AttendanceDesk({ users, attendance, onSaveAttendance, on
                                 <tr>
                                     <td colSpan="4" className="py-12 text-center text-gray">
                                         <AlertIcon className="w-6 h-6 mx-auto mb-2" />
-                                        No students match this filter.
+                                        No faculty or staff match this filter.
                                     </td>
                                 </tr>
                             ) : (
@@ -176,7 +178,7 @@ export default function AttendanceDesk({ users, attendance, onSaveAttendance, on
                                                 <div className="font-bold">{s.name}</div>
                                                 {s.phone && <div className="text-[10px] text-gray">{s.phone}</div>}
                                             </td>
-                                            <td className="py-3 px-3 text-gray">{s.course || '—'}</td>
+                                            <td className="py-3 px-3 text-gray">{ROLE_LABELS[s.role] || s.role}</td>
                                             <td className="py-3 px-4">
                                                 <div className="flex justify-end gap-1.5">
                                                     {STATUSES.map((st) => (
